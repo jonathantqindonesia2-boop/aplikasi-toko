@@ -53,19 +53,62 @@ export function InventoryTable({ products: initialProducts }: InventoryTableProp
     selling_price: "",
     stock: "",
   })
+  const [formErrors, setFormErrors] = useState({
+    name: "",
+    cost_price: "",
+    selling_price: "",
+    stock: "",
+  })
+
+  const validateForm = () => {
+    const errors = {
+      name: "",
+      cost_price: "",
+      selling_price: "",
+      stock: "",
+    }
+
+    if (!formData.name.trim()) {
+      errors.name = "Nama produk wajib diisi."
+    }
+
+    const cost = parseFloat(formData.cost_price)
+    if (formData.cost_price === "" || Number.isNaN(cost) || cost < 0) {
+      errors.cost_price = "Harga modal harus angka 0 atau lebih."
+    }
+
+    const selling = parseFloat(formData.selling_price)
+    if (formData.selling_price === "" || Number.isNaN(selling) || selling < 0) {
+      errors.selling_price = "Harga jual harus angka 0 atau lebih."
+    }
+
+    const stock = parseInt(formData.stock, 10)
+    if (formData.stock === "" || Number.isNaN(stock) || stock < 0) {
+      errors.stock = "Stok harus bilangan bulat 0 atau lebih."
+    }
+
+    setFormErrors(errors)
+    return !Object.values(errors).some(Boolean)
+  }
+
+  const updateFormField = (field: keyof typeof formData, value: string) => {
+    setFormData((prev) => ({ ...prev, [field]: value }))
+    setFormErrors((prev) => ({ ...prev, [field]: "" }))
+  }
 
   const filteredProducts = products.filter((product) =>
     product.name.toLowerCase().includes(searchQuery.toLowerCase())
   )
 
   const handleAdd = async () => {
+    if (!validateForm()) return
     setIsLoading(true)
     const supabase = createClient()
     const { error } = await supabase.from("products").insert({
-      name: formData.name,
+      name: formData.name.trim(),
       cost_price: parseFloat(formData.cost_price),
       selling_price: parseFloat(formData.selling_price),
-      stock: parseInt(formData.stock),
+      stock: parseInt(formData.stock, 10),
     })
 
     if (!error) {
@@ -80,15 +123,16 @@ export function InventoryTable({ products: initialProducts }: InventoryTableProp
 
   const handleEdit = async () => {
     if (!selectedProduct) return
+    if (!validateForm()) return
     setIsLoading(true)
     const supabase = createClient()
     const { error } = await supabase
       .from("products")
       .update({
-        name: formData.name,
+        name: formData.name.trim(),
         cost_price: parseFloat(formData.cost_price),
         selling_price: parseFloat(formData.selling_price),
-        stock: parseInt(formData.stock),
+        stock: parseInt(formData.stock, 10),
       })
       .eq("id", selectedProduct.id)
 
@@ -128,6 +172,7 @@ export function InventoryTable({ products: initialProducts }: InventoryTableProp
       selling_price: product.selling_price.toString(),
       stock: product.stock.toString(),
     })
+    setFormErrors({ name: "", cost_price: "", selling_price: "", stock: "" })
     setIsEditOpen(true)
   }
 
@@ -160,6 +205,7 @@ export function InventoryTable({ products: initialProducts }: InventoryTableProp
         <Button
           onClick={() => {
             setFormData({ name: "", cost_price: "", selling_price: "", stock: "" })
+            setFormErrors({ name: "", cost_price: "", selling_price: "", stock: "" })
             setIsAddOpen(true)
           }}
         >
@@ -236,9 +282,12 @@ export function InventoryTable({ products: initialProducts }: InventoryTableProp
               <Input
                 id="name"
                 value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                onChange={(e) => updateFormField("name", e.target.value)}
                 placeholder="Masukkan nama produk"
               />
+              {formErrors.name && (
+                <p className="text-sm text-destructive">{formErrors.name}</p>
+              )}
             </div>
             <div className="grid gap-2">
               <Label htmlFor="cost_price">Harga Modal (Rp)</Label>
@@ -246,9 +295,12 @@ export function InventoryTable({ products: initialProducts }: InventoryTableProp
                 id="cost_price"
                 type="number"
                 value={formData.cost_price}
-                onChange={(e) => setFormData({ ...formData, cost_price: e.target.value })}
+                onChange={(e) => updateFormField("cost_price", e.target.value)}
                 placeholder="0"
               />
+              {formErrors.cost_price && (
+                <p className="text-sm text-destructive">{formErrors.cost_price}</p>
+              )}
             </div>
             <div className="grid gap-2">
               <Label htmlFor="selling_price">Harga Jual (Rp)</Label>
@@ -256,9 +308,12 @@ export function InventoryTable({ products: initialProducts }: InventoryTableProp
                 id="selling_price"
                 type="number"
                 value={formData.selling_price}
-                onChange={(e) => setFormData({ ...formData, selling_price: e.target.value })}
+                onChange={(e) => updateFormField("selling_price", e.target.value)}
                 placeholder="0"
               />
+              {formErrors.selling_price && (
+                <p className="text-sm text-destructive">{formErrors.selling_price}</p>
+              )}
             </div>
             <div className="grid gap-2">
               <Label htmlFor="stock">Stok Awal</Label>
@@ -266,16 +321,19 @@ export function InventoryTable({ products: initialProducts }: InventoryTableProp
                 id="stock"
                 type="number"
                 value={formData.stock}
-                onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
+                onChange={(e) => updateFormField("stock", e.target.value)}
                 placeholder="0"
               />
+              {formErrors.stock && (
+                <p className="text-sm text-destructive">{formErrors.stock}</p>
+              )}
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsAddOpen(false)}>
               Batal
             </Button>
-            <Button onClick={handleAdd} disabled={isLoading || !formData.name}>
+            <Button onClick={handleAdd} disabled={isLoading}>
               {isLoading ? "Menyimpan..." : "Simpan"}
             </Button>
           </DialogFooter>
@@ -294,8 +352,11 @@ export function InventoryTable({ products: initialProducts }: InventoryTableProp
               <Input
                 id="edit-name"
                 value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                onChange={(e) => updateFormField("name", e.target.value)}
               />
+              {formErrors.name && (
+                <p className="text-sm text-destructive">{formErrors.name}</p>
+              )}
             </div>
             <div className="grid gap-2">
               <Label htmlFor="edit-cost_price">Harga Modal (Rp)</Label>
@@ -303,8 +364,11 @@ export function InventoryTable({ products: initialProducts }: InventoryTableProp
                 id="edit-cost_price"
                 type="number"
                 value={formData.cost_price}
-                onChange={(e) => setFormData({ ...formData, cost_price: e.target.value })}
+                onChange={(e) => updateFormField("cost_price", e.target.value)}
               />
+              {formErrors.cost_price && (
+                <p className="text-sm text-destructive">{formErrors.cost_price}</p>
+              )}
             </div>
             <div className="grid gap-2">
               <Label htmlFor="edit-selling_price">Harga Jual (Rp)</Label>
@@ -312,8 +376,11 @@ export function InventoryTable({ products: initialProducts }: InventoryTableProp
                 id="edit-selling_price"
                 type="number"
                 value={formData.selling_price}
-                onChange={(e) => setFormData({ ...formData, selling_price: e.target.value })}
+                onChange={(e) => updateFormField("selling_price", e.target.value)}
               />
+              {formErrors.selling_price && (
+                <p className="text-sm text-destructive">{formErrors.selling_price}</p>
+              )}
             </div>
             <div className="grid gap-2">
               <Label htmlFor="edit-stock">Stok</Label>
@@ -321,8 +388,11 @@ export function InventoryTable({ products: initialProducts }: InventoryTableProp
                 id="edit-stock"
                 type="number"
                 value={formData.stock}
-                onChange={(e) => setFormData({ ...formData, stock: e.target.value })}
+                onChange={(e) => updateFormField("stock", e.target.value)}
               />
+              {formErrors.stock && (
+                <p className="text-sm text-destructive">{formErrors.stock}</p>
+              )}
             </div>
           </div>
           <DialogFooter>
